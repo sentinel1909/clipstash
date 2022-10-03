@@ -1,5 +1,5 @@
 use clipstash::data::AppDatabase;
-use clipstash::web::renderer::Renderer;
+use clipstash::web::{renderer::Renderer, hitcounter::HitCounter};
 use dotenv::dotenv;
 use std::path::PathBuf;
 use clap::Parser;
@@ -20,20 +20,25 @@ fn main() {
     let rt = tokio::runtime::Runtime::new()
         .expect("failed to spawn tokio runtime");
 
-        let handle = rt.handle().clone();
+    let handle = rt.handle().clone();
+    let renderer = Renderer::new(args.template_directory.clone());
+    let database = rt.block_on(async move {
+        AppDatabase::new(&args.connection_string).await
+    }); 
 
-        rt.block_on(async move {
-            let renderer = Renderer::new(args.template_directory);
-            let database = AppDatabase::new(&args.connection_string).await;
+    let hit_counter = HitCounter::new(database.get_pool().clone(), handle.clone());
 
-            let config = clipstash::RocketConfig {
-                renderer,
-                database,
-            };
-
-            clipstash::rocket(config)
-                .launch()
-                .await
-                .expect("failed to launch rocket server")
-        });
+    let config = clipstash::RocketConfig {
+        renderer,
+        database,
+        hit_counter,
+    };
+                 
+    rt.block_on(async move {
+        clipstash::rocket(config)
+            .launch()
+            .await
+            .expect("failed to launch rocket server")
+    });
+            
 }
