@@ -3,7 +3,7 @@ use crate::web::ctx;
 #[derive(Debug, thiserror::Error)]
 pub enum RenderError {
     #[error("rendering error: {0}")]
-    Render(#[from] handlebars::RenderError)
+    Render(#[from] handlebars::RenderError),
 }
 
 pub struct Renderer<'a>(handlebars::Handlebars<'a>);
@@ -20,10 +20,9 @@ impl<'a> Renderer<'a> {
     fn convert_to_value<S>(serializable: &S) -> serde_json::Value
     where
         S: serde::Serialize + std::fmt::Debug,
-        {
-            serde_json::to_value(&serializable)
-                .expect("failed to convert structure to value")
-        }
+    {
+        serde_json::to_value(&serializable).expect("failed to convert structure to value")
+    }
 
     pub fn render<P>(&self, context: P, errors: &[&str]) -> String
     where
@@ -38,11 +37,7 @@ impl<'a> Renderer<'a> {
         self.do_render(context.template_path(), value)
     }
 
-    pub fn render_with_data<P, D>(
-        &self,
-        context: P,
-        data: (&str, D),
-        errors: &[&str]) -> String
+    pub fn render_with_data<P, D>(&self, context: P, data: (&str, D), errors: &[&str]) -> String
     where
         P: ctx::PageContext + serde::Serialize + std::fmt::Debug,
         D: serde::Serialize + std::fmt::Debug,

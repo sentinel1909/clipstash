@@ -1,6 +1,6 @@
 use crate::data::DatabasePool;
-use crate::ShortCode;
 use crate::service::{self, ServiceError};
+use crate::ShortCode;
 use crossbeam_channel::TryRecvError;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use parking_lot::Mutex;
@@ -16,20 +16,24 @@ enum HitCountError {
     #[error("service error: {0}")]
     Service(#[from] ServiceError),
     #[error("communication error: {0}")]
-    Channel(#[from] crossbeam_channel::SendError<HitCounterMsg>)
+    Channel(#[from] crossbeam_channel::SendError<HitCounterMsg>),
 }
 
 enum HitCounterMsg {
     Commit,
-    Hit(ShortCode, u32)
+    Hit(ShortCode, u32),
 }
 
 pub struct HitCounter {
-    tx: Sender<HitCounterMsg>
+    tx: Sender<HitCounterMsg>,
 }
 
 impl HitCounter {
-    fn commit_hits(hits: HitStore, handle: Handle, pool: DatabasePool) -> Result<(), HitCountError> {
+    fn commit_hits(
+        hits: HitStore,
+        handle: Handle,
+        pool: DatabasePool,
+    ) -> Result<(), HitCountError> {
         let hits = Arc::clone(&hits);
 
         let hits: Vec<(ShortCode, u32)> = {
@@ -48,8 +52,13 @@ impl HitCounter {
             Ok(service::action::end_transaction(transaction).await?)
         })
     }
-    
-    fn process_msg(msg: HitCounterMsg, hits: HitStore, handle: Handle, pool: DatabasePool) -> Result<(), HitCountError> {
+
+    fn process_msg(
+        msg: HitCounterMsg,
+        hits: HitStore,
+        handle: Handle,
+        pool: DatabasePool,
+    ) -> Result<(), HitCountError> {
         match msg {
             HitCounterMsg::Commit => Self::commit_hits(hits.clone(), handle.clone(), pool.clone())?,
             HitCounterMsg::Hit(shortcode, count) => {
@@ -68,12 +77,15 @@ impl HitCounter {
         let _ = std::thread::spawn(move || {
             println!("HitCounter thread spawned");
             let store: HitStore = Arc::new(Mutex::new(HashMap::new()));
-        
 
             loop {
                 match rx_clone.try_recv() {
-                    Ok(msg) => if let Err(e) = Self::process_msg(msg, store.clone(), handle.clone(), pool.clone()) {
-                        eprintln!("message processing error: {}", e);
+                    Ok(msg) => {
+                        if let Err(e) =
+                            Self::process_msg(msg, store.clone(), handle.clone(), pool.clone())
+                        {
+                            eprintln!("message processing error: {}", e);
+                        }
                     }
                     Err(e) => match e {
                         TryRecvError::Empty => {
@@ -83,7 +95,7 @@ impl HitCounter {
                             }
                         }
                         _ => break,
-                    }
+                    },
                 }
             }
         });

@@ -26,8 +26,6 @@ impl Content {
 #[rocket::async_trait]
 impl<'r> FromFormField<'r> for Content {
     fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
-        Ok(Self::new(field.value)
-            .map_err(|e| form::Error::validation(format!("{}", e)))?
-        )
+        Ok(Self::new(field.value).map_err(|e| form::Error::validation(format!("{}", e)))?)
     }
 }

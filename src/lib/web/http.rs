@@ -1,7 +1,9 @@
 use crate::data::AppDatabase;
 use crate::service;
 use crate::service::action;
-use crate::web::{ctx, form, renderer::Renderer, PageError, PASSWORD_COOKIE, hitcounter::HitCounter};
+use crate::web::{
+    ctx, form, hitcounter::HitCounter, renderer::Renderer, PageError, PASSWORD_COOKIE,
+};
 use crate::{ServiceError, ShortCode};
 use rocket::form::{Contextual, Form};
 use rocket::http::{Cookie, CookieJar, Status};
@@ -58,11 +60,11 @@ pub async fn new_clip(
             .collect::<Vec<_>>();
         Err((
             Status::BadRequest,
-            RawHtml(
-                renderer.render_with_data(
-                    ctx::Home::default(), ("clip", &form.context), &errors
-                )
-            ),
+            RawHtml(renderer.render_with_data(
+                ctx::Home::default(),
+                ("clip", &form.context),
+                &errors,
+            )),
         ))
     }
 }
@@ -74,12 +76,15 @@ pub async fn get_clip(
     hit_counter: &State<HitCounter>,
     renderer: &State<Renderer<'_>>,
 ) -> Result<status::Custom<RawHtml<String>>, PageError> {
-    fn render_with_status<T: ctx::PageContext + serde::Serialize + std::fmt::Debug> (
+    fn render_with_status<T: ctx::PageContext + serde::Serialize + std::fmt::Debug>(
         status: Status,
         context: T,
         renderer: &Renderer,
     ) -> Result<status::Custom<RawHtml<String>>, PageError> {
-        Ok(status::Custom(status, RawHtml(renderer.render(context, &[]))))
+        Ok(status::Custom(
+            status,
+            RawHtml(renderer.render(context, &[])),
+        ))
     }
     match action::get_clip(shortcode.clone().into(), database.get_pool()).await {
         Ok(clip) => {
@@ -94,7 +99,7 @@ pub async fn get_clip(
             }
             ServiceError::NotFound => Err(PageError::NotFound("Clip not found".to_owned())),
             _ => Err(PageError::Internal("server error".to_owned())),
-        }
+        },
     }
 }
 
@@ -129,7 +134,7 @@ pub async fn submit_clip_password(
                 }
                 ServiceError::NotFound => Err(PageError::NotFound("Clip not found".to_owned())),
                 _ => Err(PageError::Internal("server error".to_owned())),
-            }
+            },
         }
     } else {
         let context = ctx::PasswordRequired::new(shortcode);
@@ -145,7 +150,7 @@ pub async fn get_raw_clip(
     cookies: &CookieJar<'_>,
     shortcode: ShortCode,
     hit_counter: &State<HitCounter>,
-    database: &State<AppDatabase>
+    database: &State<AppDatabase>,
 ) -> Result<status::Custom<String>, Status> {
     use crate::domain::clip::field::Password;
     let req = service::ask::GetClip {
@@ -165,8 +170,8 @@ pub async fn get_raw_clip(
         Err(e) => match e {
             ServiceError::PermissionError(msg) => Ok(status::Custom(Status::Unauthorized, msg)),
             ServiceError::NotFound => Err(Status::NotFound),
-            _ => Err(Status::InternalServerError)
-        }
+            _ => Err(Status::InternalServerError),
+        },
     }
 }
 
@@ -198,6 +203,4 @@ pub mod catcher {
     pub fn catchers() -> Vec<Catcher> {
         catchers![not_found, default, internal_error]
     }
-
 }
-

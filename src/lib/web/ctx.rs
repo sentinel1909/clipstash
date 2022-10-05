@@ -1,5 +1,5 @@
-use serde::Serialize;
 use derive_more::Constructor;
+use serde::Serialize;
 
 pub trait PageContext {
     fn title(&self) -> &str;
@@ -67,4 +67,3 @@ impl PageContext for PasswordRequired {
         "base"
     }
 }
-

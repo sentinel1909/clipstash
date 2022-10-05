@@ -1,7 +1,7 @@
 use crate::domain::clip::ClipError;
 use crate::domain::time::Time;
-use serde::{Deserialize, Serialize};
 use rocket::form::{self, FromFormField, ValueField};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -44,8 +44,7 @@ impl<'r> FromFormField<'r> for Expires {
             Ok(Self(None))
         } else {
             Ok(Self::from_str(field.value)
-            .map_err(|e| form::Error::validation(format!("{}", e)))?
-            )
+                .map_err(|e| form::Error::validation(format!("{}", e)))?)
         }
     }
 }

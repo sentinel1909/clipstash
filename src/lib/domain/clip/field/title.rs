@@ -1,6 +1,6 @@
 use crate::domain::clip::ClipError;
-use serde::{Deserialize, Serialize};
 use rocket::form::{self, FromFormField, ValueField};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
