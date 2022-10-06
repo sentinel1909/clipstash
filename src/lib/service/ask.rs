@@ -1,9 +1,9 @@
 use crate::domain::clip::field;
 use crate::ShortCode;
 
-use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct NewClip {
     pub content: field::Content,
     pub title: field::Title,
@@ -11,6 +11,7 @@ pub struct NewClip {
     pub password: field::Password,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct UpdateClip {
     pub content: field::Content,
     pub title: field::Title,

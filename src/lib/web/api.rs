@@ -78,3 +78,135 @@ impl From<ServiceError> for ApiError {
         }
     }
 }
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for ApiKey {
+    type Error = ApiError;
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        fn server_error() -> Outcome<ApiKey, ApiError> {
+            Outcome::Failure((
+                Status::InternalServerError,
+                ApiError::Server(Json("server error".to_string())),
+            ))
+
+        }
+
+        fn key_error(e: ApiKeyError) -> Outcome<ApiKey, ApiError> {
+            Outcome::Failure((Status::BadRequest, ApiError::KeyError(Json(e))))
+            
+        }
+        match req.headers().get_one(API_KEY_HEADER) {
+            None => key_error(ApiKeyError::NotFound("API key not found".to_string())),
+            Some(key) => {
+                let db = match req.guard::<&State<AppDatabase>>().await {
+                    Outcome::Success(db) => db,
+                    _ => return server_error(),
+                };
+                let api_key = match ApiKey::from_str(key) {
+                    Ok(key) => key,
+                    Err(e) => return key_error(e),
+                };
+                match action::api_key_is_valid(api_key.clone(), db.get_pool()).await {
+                    Ok(valid) if valid => Outcome::Success(api_key),
+                    Ok(valid) if !valid => {
+                        key_error(ApiKeyError::NotFound("API key not found".to_owned()))
+                    }
+                    _ => server_error(),
+                }
+            }
+        }
+    }
+}
+
+#[rocket::get("/key")]
+pub async fn new_api_key(database: &State<AppDatabase>) -> Result<Json<&str>, ApiError> {
+    let api_key = action::generate_api_key(database.get_pool()).await?;
+    println!("Api Key: {}", api_key.to_base64());
+    Ok(Json("Api key generated. See logs for details."))
+}
+
+#[rocket::get("/<shortcode>")]
+pub async fn get_clip(
+    shortcode: &str,
+    database: &State<AppDatabase>,
+    cookie: &CookieJar<'_>,
+    hit_counter: &State<HitCounter>,
+    _api_key: ApiKey,
+) -> Result<Json<crate::Clip>, ApiError> {
+    use crate::domain::clip::field::Password;
+
+    let req = service::ask::GetClip {
+        shortcode: shortcode.into(),
+        password: cookie
+            .get(PASSWORD_COOKIE)
+            .map(|cookie| cookie.value())
+            .map(|raw_password| Password::new(raw_password.to_string()).ok())
+            .flatten()
+            .unwrap_or_else(Password::default)
+    };
+    let clip = action::get_clip(req, database.get_pool()).await?;
+    hit_counter.hit(shortcode.into(), 1);
+    Ok(Json(clip))
+}
+
+#[rocket::post("/", data = "<req>")]
+pub async fn new_clip(
+    req: Json<service::ask::NewClip>,
+    database: &State<AppDatabase>,
+    _api_key: ApiKey,
+) -> Result<Json<crate::Clip>, ApiError> {
+    let clip = action::new_clip(req.into_inner(), database.get_pool()).await?;
+    Ok(Json(clip))
+}
+
+#[rocket::put("/", data = "<req>")]
+pub async fn update_clip(
+    req: Json<service::ask::UpdateClip>,
+    database: &State<AppDatabase>,
+    _api_key: ApiKey,
+) -> Result<Json<crate::Clip>, ApiError> {
+    let clip = action::update_clip(req.into_inner(), database.get_pool()).await?;
+    Ok(Json(clip))
+}
+
+pub fn routes() -> Vec<rocket::Route> {
+    rocket::routes!(get_clip, new_clip, update_clip, new_api_key)
+}
+
+pub mod catcher {
+    use rocket::serde::json::Json;
+    use rocket::Request;
+    use rocket::{catch, catchers, Catcher};
+
+    #[catch(default)]
+    fn default(req: &Request) -> Json<&'static str> {
+        eprintln!("General error: {:?}", req);
+        Json("something went wrong...")
+    }
+
+    #[catch(500)]
+    fn internal_error(req: &Request) -> Json<&'static str> {
+        eprintln!("Internal error: {:?}", req);
+        Json("internal server error")
+    }
+
+    #[catch(404)]
+    fn not_found(req: &Request) -> Json<&'static str> {
+        Json("404")
+    }
+
+    #[catch(401)]
+    fn request_error() -> Json<&'static str> {
+        Json("request error")
+    }
+
+    #[catch(400)]
+    fn missing_api_key() -> Json<&'static str> {
+        Json("API key missing or invalid")
+    }
+
+    pub fn catchers() -> Vec<Catcher> {
+        catchers![not_found, default, internal_error, request_error, missing_api_key]
+    }
+}
