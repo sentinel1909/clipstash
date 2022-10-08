@@ -192,7 +192,7 @@ pub mod catcher {
     }
 
     #[catch(404)]
-    fn not_found(req: &Request) -> Json<&'static str> {
+    fn not_found(_req: &Request) -> Json<&'static str> {
         Json("404")
     }
 

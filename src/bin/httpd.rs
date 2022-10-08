@@ -1,5 +1,6 @@
 use clap::Parser;
 use clipstash::data::AppDatabase;
+use clipstash::domain::maintenance::Maintenance;
 use clipstash::web::{hitcounter::HitCounter, renderer::Renderer};
 use dotenv::dotenv;
 use std::path::PathBuf;
@@ -25,11 +26,13 @@ fn main() {
     let database = rt.block_on(async move { AppDatabase::new(&args.connection_string).await });
 
     let hit_counter = HitCounter::new(database.get_pool().clone(), handle.clone());
+    let maintenance = Maintenance::spawn(database.get_pool().clone(), handle.clone());
 
     let config = clipstash::RocketConfig {
         renderer,
         database,
         hit_counter,
+        maintenance,
     };
 
     rt.block_on(async move {

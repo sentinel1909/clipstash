@@ -196,7 +196,7 @@ pub mod catcher {
     }
 
     #[catch(404)]
-    fn not_found(req: &Request) -> &'static str {
+    fn not_found(_req: &Request) -> &'static str {
         "404"
     }
 
